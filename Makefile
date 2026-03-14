@@ -15,9 +15,9 @@ bootstrap:
 ## Run linters across gateway and any other local services
 lint:
 	@echo ">>> Linting gateway (Python)..."
-	@cd gateway && pip install flake8 --quiet && flake8 . --max-line-length=120 || true
+	@cd gateway && pip install flake8 --quiet && flake8 . --max-line-length=120
 	@echo ">>> Linting desktop/electron (JS)..."
-	@cd desktop/electron && npx eslint . --ext .js || true
+	@cd desktop/electron && npx eslint . --ext .js
 
 ## Stop and remove containers
 down:
