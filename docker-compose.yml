@@ -1,0 +1,82 @@
+version: "3.8"
+
+services:
+  gateway:
+    build:
+      context: ./gateway
+    image: "${DOCKER_REGISTRY:-massive}/gateway:dev"
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - JWT_SECRET=${JWT_SECRET:-devsecret}
+      - RAGFLOW_URL=http://ragflow:5100
+      - CONSCIOUS_RIVER_URL=http://conscious-river:5200
+    depends_on:
+      - ragflow
+      - conscious-river
+    env_file:
+      - .env
+
+  ragflow:
+    build:
+      context: ../ragflow
+    image: "${DOCKER_REGISTRY:-massive}/ragflow:dev"
+    ports:
+      - "5100:5100"
+    environment:
+      - RAGFLOW_PORT=5100
+      - VECTOR_DB_URL=${VECTOR_DB_URL:-http://vectordb:7231}
+    volumes:
+      - rag-data:/data
+    env_file:
+      - .env
+
+  conscious-river:
+    build:
+      context: ../conscious-river
+    image: "${DOCKER_REGISTRY:-massive}/conscious-river:dev"
+    ports:
+      - "5200:5200"
+    environment:
+      - CR_PORT=5200
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+    depends_on:
+      - redis
+    env_file:
+      - .env
+
+  research-agent:
+    build:
+      context: ../Liquidation-Analysis-using-Multi-Agent-Reinforcement-Learning-ICML-2019
+    image: "${DOCKER_REGISTRY:-massive}/research-agent:dev"
+    ports:
+      - "5300:5300"
+    environment:
+      - AGENT_ENV=sim
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379}
+    depends_on:
+      - ragflow
+      - conscious-river
+    env_file:
+      - .env
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  vectordb:
+    # Placeholder: replace with your chosen vector DB (Weaviate, Milvus, Qdrant, etc.)
+    # Example Weaviate: image: semitechnologies/weaviate:latest
+    image: qdrant/qdrant:latest
+    ports:
+      - "7231:6333"
+    environment:
+      - QDRANT__SERVICE__HTTP_PORT=6333
+
+volumes:
+  redis-data:
+  rag-data:

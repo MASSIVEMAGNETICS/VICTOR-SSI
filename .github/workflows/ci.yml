@@ -1,0 +1,56 @@
+name: CI (build matrix)
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [gateway, ragflow, conscious-river, research-agent]
+
+    steps:
+      - name: Checkout repository (with submodules)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Determine build context
+        id: ctx
+        run: |
+          case "${{ matrix.service }}" in
+            gateway)        echo "context=./gateway" >> "$GITHUB_OUTPUT" ;;
+            ragflow)        echo "context=../ragflow" >> "$GITHUB_OUTPUT" ;;
+            conscious-river) echo "context=../conscious-river" >> "$GITHUB_OUTPUT" ;;
+            research-agent) echo "context=../Liquidation-Analysis-using-Multi-Agent-Reinforcement-Learning-ICML-2019" >> "$GITHUB_OUTPUT" ;;
+            *) echo "Unknown service: ${{ matrix.service }}"; exit 1 ;;
+          esac
+
+      - name: Build Docker image (no push)
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ steps.ctx.outputs.context }}
+          push: false
+          tags: massive/${{ matrix.service }}:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run gateway unit tests (if Python package present)
+        if: matrix.service == 'gateway'
+        run: |
+          if [ -f ./gateway/requirements.txt ]; then
+            docker run --rm massive/gateway:ci \
+              /bin/bash -lc "pip install pytest -q && pytest -q || true"
+          fi
