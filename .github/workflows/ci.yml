@@ -8,6 +8,7 @@ on:
 
 permissions:
   contents: read
+  actions: write  # required for GitHub Actions cache (cache-to: type=gha)
 
 jobs:
   build-and-test:
@@ -15,13 +16,35 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        service: [gateway, ragflow, conscious-river, research-agent]
+        include:
+          - service: gateway
+            context: ./gateway
+          - service: ragflow
+            context: ./ragflow
+            checkout_repo: MASSIVEMAGNETICS/ragflow
+            checkout_path: ragflow
+          - service: conscious-river
+            context: ./conscious-river
+            checkout_repo: MASSIVEMAGNETICS/conscious-river
+            checkout_path: conscious-river
+          - service: research-agent
+            context: ./Liquidation-Analysis-using-Multi-Agent-Reinforcement-Learning-ICML-2019
+            checkout_repo: MASSIVEMAGNETICS/Liquidation-Analysis-using-Multi-Agent-Reinforcement-Learning-ICML-2019
+            checkout_path: Liquidation-Analysis-using-Multi-Agent-Reinforcement-Learning-ICML-2019
 
     steps:
-      - name: Checkout repository
+      - name: Checkout orchestration repo
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Checkout component repo
+        if: matrix.checkout_repo != null
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.checkout_repo }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ matrix.checkout_path }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -29,46 +52,30 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Clone sibling component repos (for non-gateway services)
-        if: matrix.service != 'gateway'
+      - name: Verify build context and Dockerfile
         run: |
-          cd ..
-          case "${{ matrix.service }}" in
-            ragflow)
-              git clone --depth 1 https://github.com/MASSIVEMAGNETICS/ragflow.git ragflow || \
-                echo "WARNING: ragflow repo not accessible; build will fail or use stub"
-              ;;
-            conscious-river)
-              git clone --depth 1 https://github.com/MASSIVEMAGNETICS/conscious-river.git conscious-river || \
-                echo "WARNING: conscious-river repo not accessible; build will fail or use stub"
-              ;;
-            research-agent)
-              git clone --depth 1 \
-                https://github.com/MASSIVEMAGNETICS/Liquidation-Analysis-using-Multi-Agent-Reinforcement-Learning-ICML-2019.git \
-                Liquidation-Analysis-using-Multi-Agent-Reinforcement-Learning-ICML-2019 || \
-                echo "WARNING: research-agent repo not accessible; build will fail or use stub"
-              ;;
-          esac
+          echo "==> Checking build context: ${{ matrix.context }}"
+          if [ ! -d "${{ matrix.context }}" ]; then
+            echo "ERROR: Build context directory '${{ matrix.context }}' does not exist."
+            ls -la .
+            exit 1
+          fi
+          if [ ! -f "${{ matrix.context }}/Dockerfile" ]; then
+            echo "WARNING: No Dockerfile found in '${{ matrix.context }}'. Listing directory:"
+            ls -la "${{ matrix.context }}"
+          else
+            echo "OK: Dockerfile found at ${{ matrix.context }}/Dockerfile"
+          fi
 
-      - name: Determine build context
-        id: ctx
-        run: |
-          case "${{ matrix.service }}" in
-            gateway)        echo "context=./gateway" >> "$GITHUB_OUTPUT" ;;
-            ragflow)        echo "context=../ragflow" >> "$GITHUB_OUTPUT" ;;
-            conscious-river) echo "context=../conscious-river" >> "$GITHUB_OUTPUT" ;;
-            research-agent) echo "context=../Liquidation-Analysis-using-Multi-Agent-Reinforcement-Learning-ICML-2019" >> "$GITHUB_OUTPUT" ;;
-            *) echo "Unknown service: ${{ matrix.service }}"; exit 1 ;;
-          esac
-
-      - name: Build Docker image (no push)
+      - name: Build Docker image (load into daemon, no push)
         uses: docker/build-push-action@v5
         with:
-          context: ${{ steps.ctx.outputs.context }}
+          context: ${{ matrix.context }}
           push: false
+          load: true
           tags: massive/${{ matrix.service }}:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
       - name: Run gateway unit tests (if Python package present)
         if: matrix.service == 'gateway'
