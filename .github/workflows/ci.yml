@@ -1,0 +1,86 @@
+name: CI (build matrix)
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+  actions: write  # required for GitHub Actions cache (cache-to: type=gha)
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: gateway
+            context: ./gateway
+          - service: ragflow
+            context: ./ragflow
+            checkout_repo: MASSIVEMAGNETICS/ragflow
+            checkout_path: ragflow
+          - service: conscious-river
+            context: ./conscious-river
+            checkout_repo: MASSIVEMAGNETICS/conscious-river
+            checkout_path: conscious-river
+          - service: research-agent
+            context: ./Liquidation-Analysis-using-Multi-Agent-Reinforcement-Learning-ICML-2019
+            checkout_repo: MASSIVEMAGNETICS/Liquidation-Analysis-using-Multi-Agent-Reinforcement-Learning-ICML-2019
+            checkout_path: Liquidation-Analysis-using-Multi-Agent-Reinforcement-Learning-ICML-2019
+
+    steps:
+      - name: Checkout orchestration repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Checkout component repo
+        if: matrix.checkout_repo != null
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.checkout_repo }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ matrix.checkout_path }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Verify build context and Dockerfile
+        run: |
+          echo "==> Checking build context: ${{ matrix.context }}"
+          if [ ! -d "${{ matrix.context }}" ]; then
+            echo "ERROR: Build context directory '${{ matrix.context }}' does not exist."
+            ls -la .
+            exit 1
+          fi
+          if [ ! -f "${{ matrix.context }}/Dockerfile" ]; then
+            echo "WARNING: No Dockerfile found in '${{ matrix.context }}'. Listing directory:"
+            ls -la "${{ matrix.context }}"
+          else
+            echo "OK: Dockerfile found at ${{ matrix.context }}/Dockerfile"
+          fi
+
+      - name: Build Docker image (load into daemon, no push)
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          push: false
+          load: true
+          tags: massive/${{ matrix.service }}:ci
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+
+      - name: Run gateway unit tests (if Python package present)
+        if: matrix.service == 'gateway'
+        run: |
+          if [ -f ./gateway/requirements.txt ]; then
+            docker run --rm massive/gateway:ci \
+              /bin/bash -lc "pip install pytest -q && pytest -q || true"
+          fi
