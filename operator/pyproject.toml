@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "victor-operator"
+version = "0.1.0"
+description = "Local-first Windows digital employee runtime with policy gates, audit logs, browser automation, and resilient task execution."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Massive Magnetics" }]
+dependencies = [
+  "fastapi>=0.116,<1",
+  "uvicorn[standard]>=0.35,<1",
+  "pydantic>=2.11,<3",
+  "pydantic-settings>=2.10,<3",
+  "python-dotenv>=1.1,<2",
+  "openai>=1.97,<3",
+  "httpx>=0.28,<1",
+  "typer>=0.16,<1",
+  "rich>=14,<15",
+  "playwright>=1.54,<2",
+  "pywinauto>=0.6.9; sys_platform == 'win32'",
+  "pillow>=11.3,<12"
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.4,<9", "pytest-asyncio>=1.1,<2", "ruff>=0.12,<1"]
+
+[project.scripts]
+victor-operator = "victor_operator.cli:app"
+
+[tool.setuptools]
+packages = ["victor_operator"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
