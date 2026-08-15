@@ -9,7 +9,6 @@ from urllib.parse import urlparse
 from .config import Settings
 from .models import Action, PolicyDecision, RiskLevel
 
-
 BLOCKED_COMMAND_PATTERNS = [
     r"\bformat(?:\.com)?\b",
     r"\bshutdown(?:\.exe)?\b",
