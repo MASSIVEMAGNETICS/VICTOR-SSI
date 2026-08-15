@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 from pathlib import Path
+import re
 from urllib.parse import urlparse
 
 from .config import Settings
