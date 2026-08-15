@@ -10,7 +10,7 @@ def settings(tmp_path: Path) -> Settings:
         VICTOR_API_TOKEN="x" * 32,
         VICTOR_WORKSPACE=tmp_path / "workspace",
         VICTOR_DATA_DIR=tmp_path / "data",
-        VICTOR_ALLOWED_DOMAINS="github.com;openai.com",
+        VICTOR_ALLOWED_DOMAINS="github.com;docs.github.com",
     )
 
 
