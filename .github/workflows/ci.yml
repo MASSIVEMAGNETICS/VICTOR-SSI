@@ -25,17 +25,20 @@ jobs:
             context: ./ragflow
             checkout_repo: MASSIVEMAGNETICS/ragflow
             checkout_path: ragflow
+            checkout_ref: fix/sync-upstream-2026-08-14
           - service: conscious-river
             mode: python-tests
             context: ./conscious-river
             checkout_repo: MASSIVEMAGNETICS/conscious-river
             checkout_path: conscious-river
+            checkout_ref: main
             python_version: "3.11"
           - service: research-agent
             mode: python-syntax
             context: ./Liquidation-Analysis-using-Multi-Agent-Reinforcement-Learning-ICML-2019
             checkout_repo: MASSIVEMAGNETICS/Liquidation-Analysis-using-Multi-Agent-Reinforcement-Learning-ICML-2019
             checkout_path: Liquidation-Analysis-using-Multi-Agent-Reinforcement-Learning-ICML-2019
+            checkout_ref: master
             python_version: "3.11"
 
     steps:
@@ -51,6 +54,7 @@ jobs:
           repository: ${{ matrix.checkout_repo }}
           token: ${{ secrets.GITHUB_TOKEN }}
           path: ${{ matrix.checkout_path }}
+          ref: ${{ matrix.checkout_ref }}
 
       - name: Verify declared component contract
         shell: bash
