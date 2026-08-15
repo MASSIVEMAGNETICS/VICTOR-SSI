@@ -124,8 +124,8 @@ jobs:
             exit 1
           fi
 
-      - name: Set up Python
-        if: startsWith(matrix.mode, 'python-')
+      - name: Set up Python for testable Python component
+        if: matrix.mode == 'python-tests'
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python_version }}
@@ -141,6 +141,12 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt pytest
           python -m pytest -q
+
+      - name: Set up Python for legacy syntax gate
+        if: matrix.mode == 'python-syntax'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python_version }}
 
       - name: Compile legacy research-agent Python sources
         if: matrix.mode == 'python-syntax'
