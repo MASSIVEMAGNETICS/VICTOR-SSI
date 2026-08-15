@@ -15,8 +15,6 @@ class Settings(BaseSettings):
     port: int = Field(default=8765, alias="VICTOR_PORT", ge=1, le=65535)
     workspace: Path = Field(default=Path.home() / "VictorWorkspace", alias="VICTOR_WORKSPACE")
     data_dir: Path = Field(default=Path.home() / ".victor-operator", alias="VICTOR_DATA_DIR")
-    model: str = Field(default="gpt-5.5", alias="VICTOR_MODEL")
-    openai_api_key: str | None = Field(default=None, alias="OPENAI_API_KEY")
     allowed_domains: list[str] = Field(default_factory=list, alias="VICTOR_ALLOWED_DOMAINS")
     browser_headless: bool = Field(default=False, alias="VICTOR_BROWSER_HEADLESS")
     browser_channel: str | None = Field(default="chrome", alias="VICTOR_BROWSER_CHANNEL")
