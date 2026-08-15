@@ -40,7 +40,9 @@ class ExecutorHub:
                 result = await asyncio.to_thread(self._windows, action)
             else:
                 result = ToolResult(ok=False, error=f"No executor for {action.tool}")
-        except Exception as exc:
+        # This is an intentional fault-containment boundary: tool/plugin exceptions
+        # become auditable ToolResult failures instead of killing the worker loop.
+        except Exception as exc:  # noqa: BLE001
             result = ToolResult(ok=False, error=f"{type(exc).__name__}: {exc}")
         result.duration_ms = int((time.perf_counter() - started) * 1000)
         return result
@@ -149,6 +151,7 @@ class ExecutorHub:
             encoding="utf-8",
             errors="replace",
             env={**os.environ, "POWERSHELL_TELEMETRY_OPTOUT": "1"},
+            check=False,
         )
         output = {
             "exit_code": completed.returncode,
@@ -176,7 +179,9 @@ class ExecutorHub:
             self._browser_context = await self._playwright.chromium.launch_persistent_context(
                 str(user_data), **launch_kwargs
             )
-        except Exception:
+        # Browser engines expose provider-specific exception subclasses; this bounded
+        # fallback only retries without an unavailable configured browser channel.
+        except Exception:  # noqa: BLE001
             launch_kwargs.pop("channel", None)
             self._browser_context = await self._playwright.chromium.launch_persistent_context(
                 str(user_data), **launch_kwargs
