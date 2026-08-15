@@ -16,7 +16,6 @@ from .policy import PolicyEngine, action_digest
 from .store import TaskStore
 from .worker import Worker
 
-
 DASHBOARD = """<!doctype html><html><head><meta charset='utf-8'><title>Victor Operator</title>
 <style>body{font:16px system-ui;max-width:920px;margin:40px auto;padding:0 16px;background:#101114;color:#eee}textarea,input{width:100%;box-sizing:border-box;background:#191b20;color:#eee;border:1px solid #444;padding:12px}button{padding:10px 16px;margin:8px 8px 8px 0}pre{white-space:pre-wrap;background:#191b20;padding:12px;overflow:auto}.task{border:1px solid #333;padding:16px;margin:14px 0}.hint{color:#aaa;font-size:.9rem}</style></head>
 <body><h1>Victor Operator</h1><p>Local-first execution control plane. Hosted cognition is disabled; submit an explicit bounded plan.</p><label>API token</label><input id='token' type='password'><label>Goal</label><textarea id='goal' rows='3'>Inspect the workspace.</textarea><label>Explicit steps (JSON array)</label><textarea id='steps' rows='10'>[{"tool":"filesystem.list","arguments":{"path":"."}}]</textarea><p class='hint'>Every action still passes the policy/approval boundary. A goal without steps fails closed.</p><button onclick='submitTask()'>Execute plan</button><button onclick='loadTasks()'>Refresh</button><div id='tasks'></div>
