@@ -1,4 +1,4 @@
-name: CI (build matrix)
+name: CI (component capability matrix)
 
 on:
   push:
@@ -11,26 +11,36 @@ permissions:
   actions: write  # required for GitHub Actions cache (cache-to: type=gha)
 
 jobs:
-  build-and-test:
+  validate-component:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         include:
           - service: gateway
+            mode: docker
             context: ./gateway
           - service: ragflow
+            mode: vendor-snapshot
             context: ./ragflow
             checkout_repo: MASSIVEMAGNETICS/ragflow
             checkout_path: ragflow
+            checkout_ref: e441c17c2cfa5b5a35de09b64745aa4caaf41b48
+            expected_commit: e441c17c2cfa5b5a35de09b64745aa4caaf41b48
           - service: conscious-river
+            mode: python-tests
             context: ./conscious-river
             checkout_repo: MASSIVEMAGNETICS/conscious-river
             checkout_path: conscious-river
+            checkout_ref: main
+            python_version: "3.11"
           - service: research-agent
+            mode: python-syntax
             context: ./Liquidation-Analysis-using-Multi-Agent-Reinforcement-Learning-ICML-2019
             checkout_repo: MASSIVEMAGNETICS/Liquidation-Analysis-using-Multi-Agent-Reinforcement-Learning-ICML-2019
             checkout_path: Liquidation-Analysis-using-Multi-Agent-Reinforcement-Learning-ICML-2019
+            checkout_ref: master
+            python_version: "3.11"
 
     steps:
       - name: Checkout orchestration repo
@@ -45,29 +55,77 @@ jobs:
           repository: ${{ matrix.checkout_repo }}
           token: ${{ secrets.GITHUB_TOKEN }}
           path: ${{ matrix.checkout_path }}
+          ref: ${{ matrix.checkout_ref }}
+
+      - name: Verify declared component contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "service=${{ matrix.service }}"
+          echo "mode=${{ matrix.mode }}"
+          echo "context=${{ matrix.context }}"
+          test -d "${{ matrix.context }}" || {
+            echo "ERROR: declared context '${{ matrix.context }}' does not exist"
+            exit 1
+          }
+          case "${{ matrix.mode }}" in
+            docker)
+              test -f "${{ matrix.context }}/Dockerfile" || {
+                echo "ERROR: docker-mode component has no Dockerfile: ${{ matrix.context }}/Dockerfile"
+                exit 1
+              }
+              ;;
+            vendor-snapshot)
+              actual_commit=$(git -C "${{ matrix.context }}" rev-parse HEAD)
+              test "$actual_commit" = "${{ matrix.expected_commit }}" || {
+                echo "ERROR: vendor snapshot mismatch: expected ${{ matrix.expected_commit }}, got $actual_commit"
+                exit 1
+              }
+              echo "Vendor snapshot identity verified at $actual_commit. Build/runtime compatibility is deferred and not claimed."
+              ;;
+            python-tests)
+              test -f "${{ matrix.context }}/requirements.txt" || {
+                echo "ERROR: python-tests component has no requirements.txt"
+                exit 1
+              }
+              find "${{ matrix.context }}" -maxdepth 1 -type f -name 'test_*.py' -print -quit | grep -q . || {
+                echo "ERROR: python-tests component has no root test_*.py files"
+                exit 1
+              }
+              ;;
+            python-syntax)
+              find "${{ matrix.context }}" -maxdepth 1 -type f -name '*.py' -print -quit | grep -q . || {
+                echo "ERROR: python-syntax component has no Python source files"
+                exit 1
+              }
+              ;;
+            *)
+              echo "ERROR: unsupported validation mode '${{ matrix.mode }}'"
+              exit 1
+              ;;
+          esac
+
+      - name: Record deferred vendor status
+        if: matrix.mode == 'vendor-snapshot'
+        shell: bash
+        run: |
+          {
+            echo "### ${{ matrix.service }} vendor status"
+            echo "- immutable snapshot: \`${{ matrix.expected_commit }}\`"
+            echo "- runtime/build validation: deferred"
+            echo "- vendor migration: review independently before adoption"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up QEMU
+        if: matrix.mode == 'docker'
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
+        if: matrix.mode == 'docker'
         uses: docker/setup-buildx-action@v3
 
-      - name: Verify build context and Dockerfile
-        run: |
-          echo "==> Checking build context: ${{ matrix.context }}"
-          if [ ! -d "${{ matrix.context }}" ]; then
-            echo "ERROR: Build context directory '${{ matrix.context }}' does not exist."
-            ls -la .
-            exit 1
-          fi
-          if [ ! -f "${{ matrix.context }}/Dockerfile" ]; then
-            echo "WARNING: No Dockerfile found in '${{ matrix.context }}'. Listing directory:"
-            ls -la "${{ matrix.context }}"
-          else
-            echo "OK: Dockerfile found at ${{ matrix.context }}/Dockerfile"
-          fi
-
       - name: Build Docker image (load into daemon, no push)
+        if: matrix.mode == 'docker'
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.context }}
@@ -77,10 +135,48 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
-      - name: Run gateway unit tests (if Python package present)
-        if: matrix.service == 'gateway'
+      - name: Run gateway unit tests inside built image
+        if: matrix.service == 'gateway' && matrix.mode == 'docker'
+        shell: bash
         run: |
+          set -euo pipefail
           if [ -f ./gateway/requirements.txt ]; then
             docker run --rm massive/gateway:ci \
-              /bin/bash -lc "pip install pytest -q && pytest -q || true"
+              /bin/bash -lc "python -m pip install pytest -q && pytest -q"
+          else
+            echo "ERROR: gateway/requirements.txt is missing"
+            exit 1
           fi
+
+      - name: Set up Python for testable Python component
+        if: matrix.mode == 'python-tests'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python_version }}
+          cache: pip
+          cache-dependency-path: ${{ matrix.context }}/requirements.txt
+
+      - name: Run Conscious River tests
+        if: matrix.mode == 'python-tests'
+        working-directory: ${{ matrix.context }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pytest
+          python -m pytest -q
+
+      - name: Set up Python for legacy syntax gate
+        if: matrix.mode == 'python-syntax'
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python_version }}
+
+      - name: Compile legacy research-agent Python sources
+        if: matrix.mode == 'python-syntax'
+        working-directory: ${{ matrix.context }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m compileall -q .
+          echo "Syntax gate passed. Runtime compatibility is not claimed: upstream README pins Python 3.7 / TensorFlow 1.8."
