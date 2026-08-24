@@ -21,11 +21,12 @@ jobs:
             mode: docker
             context: ./gateway
           - service: ragflow
-            mode: docker
+            mode: vendor-snapshot
             context: ./ragflow
             checkout_repo: MASSIVEMAGNETICS/ragflow
             checkout_path: ragflow
-            checkout_ref: fix/sync-upstream-2026-08-14
+            checkout_ref: e441c17c2cfa5b5a35de09b64745aa4caaf41b48
+            expected_commit: e441c17c2cfa5b5a35de09b64745aa4caaf41b48
           - service: conscious-river
             mode: python-tests
             context: ./conscious-river
@@ -74,6 +75,14 @@ jobs:
                 exit 1
               }
               ;;
+            vendor-snapshot)
+              actual_commit=$(git -C "${{ matrix.context }}" rev-parse HEAD)
+              test "$actual_commit" = "${{ matrix.expected_commit }}" || {
+                echo "ERROR: vendor snapshot mismatch: expected ${{ matrix.expected_commit }}, got $actual_commit"
+                exit 1
+              }
+              echo "Vendor snapshot identity verified at $actual_commit. Build/runtime compatibility is deferred and not claimed."
+              ;;
             python-tests)
               test -f "${{ matrix.context }}/requirements.txt" || {
                 echo "ERROR: python-tests component has no requirements.txt"
@@ -95,6 +104,17 @@ jobs:
               exit 1
               ;;
           esac
+
+      - name: Record deferred vendor status
+        if: matrix.mode == 'vendor-snapshot'
+        shell: bash
+        run: |
+          {
+            echo "### ${{ matrix.service }} vendor status"
+            echo "- immutable snapshot: \`${{ matrix.expected_commit }}\`"
+            echo "- runtime/build validation: deferred"
+            echo "- vendor migration: review independently before adoption"
+          } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Set up QEMU
         if: matrix.mode == 'docker'
