@@ -44,13 +44,13 @@ jobs:
 
     steps:
       - name: Checkout orchestration repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
       - name: Checkout component repo
         if: matrix.checkout_repo != null
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: ${{ matrix.checkout_repo }}
           token: ${{ secrets.GITHUB_TOKEN }}
