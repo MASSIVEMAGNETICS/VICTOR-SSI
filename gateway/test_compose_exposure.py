@@ -3,6 +3,8 @@
 from pathlib import Path
 import re
 
+import pytest
+
 
 COMPOSE_FILE = Path(__file__).resolve().parents[1] / "docker-compose.yml"
 EXPECTED_BINDINGS = {
@@ -16,6 +18,12 @@ EXPECTED_BINDINGS = {
 
 
 def test_every_published_compose_port_is_loopback_only() -> None:
+    if not COMPOSE_FILE.is_file():
+        pytest.skip(
+            "The root Compose file is outside the gateway image build context; "
+            "the host CI step runs this contract test."
+        )
+
     content = COMPOSE_FILE.read_text(encoding="utf-8")
     bindings = set(re.findall(r'^\s+-\s+"([^"\n]+)"\s*$', content, re.MULTILINE))
 
