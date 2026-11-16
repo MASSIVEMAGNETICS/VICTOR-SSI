@@ -31,8 +31,8 @@ VICTOR-SSI is an orchestration meta-repository that composes multiple specialize
          v                          v                          v
 +--------+--------------------------+---------------------------+------------+
 |                        API Gateway (FastAPI :8080)                        |
-|  - JWT verification                                                       |
-|  - Request routing                                                        |
+|  - Current routes: /health and /components (unauthenticated)              |
+|  - No auth middleware; Compose host bindings are loopback-only            |
 |  - Rate limiting (future)                                                 |
 +----+---------------------+-------------------+------------------+---------+
      |                     |                   |                  |
@@ -63,13 +63,14 @@ VICTOR-SSI is an orchestration meta-repository that composes multiple specialize
 
 - **Technology:** Python 3.10, FastAPI, uvicorn
 - **Responsibilities:**
-  - Single ingress point for all external and desktop traffic
-  - JWT token validation and forwarding of authenticated requests
-  - Service discovery (returns component URLs via `/components`)
-  - Health aggregation (`/health`)
+  - Minimal local gateway for the currently implemented `/health` and `/components` routes
+  - No JWT or authorization middleware is currently implemented
+  - Service discovery returns configured component URLs via `/components`
+  - Liveness probe via `/health`
+  - Remote ingress is not supported until authentication, TLS, and service-level access controls exist
   - Future: rate limiting, request logging, circuit breaking
 - **Port:** 8080
-- **Config:** `RAGFLOW_URL`, `CONSCIOUS_RIVER_URL`, `RESEARCH_AGENT_URL`, `JWT_SECRET`
+- **Config:** `RAGFLOW_URL`, `CONSCIOUS_RIVER_URL`, `RESEARCH_AGENT_URL`; `JWT_SECRET` is reserved and currently unused
 
 ### RAGFlow (`../ragflow`)
 
@@ -138,7 +139,7 @@ VICTOR-SSI is an orchestration meta-repository that composes multiple specialize
 | **Redis Streams** | Durable event log between agents (ordered, consumer groups) |
 | **gRPC (future)** | High-throughput gateway → RAGFlow for large payloads |
 
-All inter-service communication inside Docker Compose uses the Docker internal network (service names as hostnames). External access is only through the gateway on port 8080.
+All inter-service communication inside Docker Compose uses the Docker internal network (service names as hostnames). Every host-published Compose port is bound to `127.0.0.1`. The gateway and component services are not a production ingress boundary; do not expose them beyond loopback.
 
 ---
 
@@ -173,9 +174,10 @@ The default is Redis Streams. For higher throughput and durability needs:
 
 ### Current (MVP)
 
-- **JWT Bearer tokens**: Gateway validates `Authorization: Bearer <token>` on all non-health endpoints.
-- `JWT_SECRET` set via environment variable.
-- Tokens generated externally (or by a future auth service).
+- No authentication or authorization middleware is implemented in `gateway/app.py`.
+- `/health` and `/components` are both unauthenticated.
+- `JWT_SECRET` is a reserved environment variable and is not read or enforced by the current gateway.
+- Docker Compose binds published host ports to `127.0.0.1`; this is a local-development boundary, not a substitute for authentication.
 
 ### Recommended (Production)
 
@@ -238,7 +240,7 @@ On release tag
 
 | Environment | Recommendation |
 |-------------|----------------|
-| **Local dev** | `.env` file (never commit) |
+| **Local dev** | `.env` file (never commit); current `JWT_SECRET` placeholder is unused by the gateway |
 | **CI (GitHub Actions)** | GitHub Actions Secrets |
 | **Production (Docker)** | Docker Secrets or mounted secret volumes |
 | **Production (K8s)** | Kubernetes Secrets (sealed-secrets or Vault) |

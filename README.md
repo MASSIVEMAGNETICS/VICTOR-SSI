@@ -1,6 +1,6 @@
 # VICTOR-SSI — Aether Hub Orchestration
 
-> **Enterprise-grade orchestration meta-repo** that composes all MASSIVEMAGNETICS component repositories into a unified, runnable platform — locally via Docker Compose and deployable to any cloud or on-premise Kubernetes cluster.
+> **Orchestration meta-repo** that composes MASSIVEMAGNETICS component repositories into a unified local development stack via Docker Compose. Kubernetes deployment remains planned; this repository does not claim a verified production deployment.
 
 ---
 
@@ -10,7 +10,7 @@ VICTOR-SSI (Aether Hub) is the orchestration layer for the MASSIVEMAGNETICS AI p
 
 | Component | Role |
 |-----------|------|
-| **API Gateway** (`./gateway`) | Central entrypoint, JWT auth, routing |
+| **API Gateway** (`./gateway`) | Minimal FastAPI gateway; current `/health` and `/components` routes are unauthenticated |
 | **RAGFlow** (`../ragflow`) | Retrieval-Augmented Generation engine |
 | **Conscious River** (`../conscious-river`) | Attention, memory & orchestration engine |
 | **Research Agent** (`../Liquidation-Analysis-…`) | Multi-agent RL environment & experiment runner |
@@ -42,11 +42,15 @@ cd VICTOR-SSI
 
 # 3. Set up environment variables
 cp .env.example .env
-# Edit .env and set your JWT_SECRET, DOCKER_REGISTRY, VECTOR_DB_URL, REDIS_URL
+# Set DOCKER_REGISTRY, VECTOR_DB_URL, and REDIS_URL as needed. JWT_SECRET is reserved for future auth and is not enforced by the current gateway.
 
 # 4. Build and start the stack
 docker-compose up --build
+```
 
+The Compose stack binds every published host port to `127.0.0.1`. The current gateway only implements unauthenticated `/health` and `/components` routes; setting `JWT_SECRET` does not authenticate requests. Keep the stack local-only. Do not expose it to a LAN/WAN until authentication, TLS, authorization, and service-level access controls are implemented.
+
+```bash
 # 5. Verify services
 curl http://localhost:8080/health       # Gateway
 curl http://localhost:5100/health       # RAGFlow
