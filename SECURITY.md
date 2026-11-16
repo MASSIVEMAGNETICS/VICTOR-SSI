@@ -13,6 +13,15 @@ Older versions may receive security patches on a best-effort basis.
 
 ---
 
+## Current network exposure boundary
+
+- `gateway/app.py` currently exposes only `/health` and `/components`; neither route has authentication middleware.
+- `JWT_SECRET` in `.env.example` is reserved for future authentication and is currently unused by the gateway.
+- Docker Compose binds all published service ports to `127.0.0.1` by default. Keep that boundary in place.
+- Do not change host bindings to `0.0.0.0` or expose the stack through public ingress until authentication, TLS, authorization, and service-level access controls are implemented and verified.
+
+---
+
 ## Reporting a Vulnerability
 
 **Do not open a public GitHub issue for security vulnerabilities.**
